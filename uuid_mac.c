@@ -31,10 +31,22 @@
 #include "uuid_ac.h"
 
 /* system headers */
+#if defined(HAVE_WINSOCK2_H) && HAVE_WINSOCK2_H
+/* workaround conflicts with system headers */
+#define uuid_t       __vendor_uuid_t
+#define uuid_create  __vendor_uuid_create
+#define uuid_compare __vendor_uuid_compare
+#include <WinSock2.h>
+#undef  uuid_t
+#undef  uuid_create
+#undef  uuid_compare
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <fcntl.h>
 #include <time.h>
 #ifdef HAVE_SYS_TIME_H
@@ -75,6 +87,9 @@
 #endif
 #ifdef HAVE_IFADDRS_H
 #include <ifaddrs.h>
+#endif
+#if defined(HAVE_IPHLPAPI_H) && HAVE_IPHLPAPI_H
+#include <iphlpapi.h>
 #endif
 
 /* own headers (part (1/2) */
@@ -175,6 +190,61 @@ int mac_address(unsigned char *data_ptr, size_t data_len)
         for (i = 0; i < MAC_LEN; i++)
             data_ptr[i] = (unsigned char)(ar.arp_ha.sa_data[i] & 0xff);
         return TRUE;
+    }
+#endif
+
+#if defined(HAVE_IPHLPAPI_H) && HAVE_IPHLPAPI_H
+    /* use GetAdaptersInfo to get the first available adapter address
+       (Windows 2000 and later!) */
+
+    /* Modified example from GetAdaptersInfo documentation */
+    {
+    PIP_ADAPTER_INFO pAdapterInfo;
+    PIP_ADAPTER_INFO pAdapter = NULL;
+    DWORD dwRetVal = 0;
+    UINT i;
+
+    ULONG ulOutBufLen = sizeof (IP_ADAPTER_INFO);
+    pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof (IP_ADAPTER_INFO));
+    if (pAdapterInfo == NULL) {
+        /* printf("Error allocating memory needed to call GetAdaptersinfo\n"); */
+        return FALSE;
+    }
+    /* Make an initial call to GetAdaptersInfo to get
+       the necessary size into the ulOutBufLen variable */
+    if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
+        free(pAdapterInfo);
+        pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+        if (pAdapterInfo == NULL) {
+            /* printf("Error allocating memory needed to call GetAdaptersinfo\n"); */
+            return FALSE;
+        }
+    }
+
+    if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR) {
+        pAdapter = pAdapterInfo;
+        while (pAdapter) {
+            if (pAdapter->Type != MIB_IF_TYPE_LOOPBACK &&
+                pAdapter->Type != MIB_IF_TYPE_PPP &&
+                pAdapter->Type != MIB_IF_TYPE_SLIP) {
+                /* This might need some refinement.
+                   If the adapter is not connected, i.e., has IP address "0.0.0.0",
+                   its MAC address is still taken into consideration. */
+                int gotsomething = 0;
+                for (i = 0; i < pAdapter->AddressLength && i < data_len; i++) {
+                    data_ptr[i] = pAdapter->Address[i];
+                    gotsomething |= data_ptr[i];
+                }
+                if (gotsomething) {
+                    free(pAdapterInfo);
+                    return TRUE;
+                }
+            }
+            pAdapter = pAdapter->Next;
+        }
+    } 
+    free(pAdapterInfo);
+
     }
 #endif
 

@@ -38,7 +38,9 @@
 #include <stdlib.h>           /* malloc, NULL, etc. */
 #include <stdarg.h>           /* va_list, etc. */
 #include <string.h>           /* size_t, strlen, etc. */
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #include <unistd.h>           /* dmalloc pre-loading */
+#endif
 
 /* enable optional "dmalloc" support */
 #ifdef WITH_DMALLOC

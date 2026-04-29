@@ -35,9 +35,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <string.h>
 #include <errno.h>
+
+#if HAVE_GETOPT_H
+#include <getopt.h>
+#endif
+#ifdef WIN32
+#define strcasecmp(a,b) strcmpi(a,b)
+#endif
 
 /* error handler */
 static void

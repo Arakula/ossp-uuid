@@ -1,0 +1,15 @@
+LIBRARY
+EXPORTS
+	uuid_create
+	uuid_destroy
+	uuid_clone
+	uuid_load
+	uuid_make
+	uuid_isnil
+	uuid_compare
+	uuid_import
+	uuid_export
+	uuid_error
+	uuid_version
+	
+; missing: C++ bindings.

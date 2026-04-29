@@ -33,14 +33,26 @@
 /* system headers */
 #include <stdlib.h>
 #include <string.h>
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <time.h>
+#if HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <fcntl.h>
 #if defined(WIN32)
 #define WINVER 0x0500
 #include <windows.h>
 #include <wincrypt.h>
+#endif
+#if HAVE_PROCESS_H
+#include <process.h>
+// since this should be mutually exclusive with <unistd.h>, declare pid_t here
+typedef int pid_t;
+#endif
+#if HAVE_IO_H
+#include <io.h>
 #endif
 
 /* own headers (part 2/2) */

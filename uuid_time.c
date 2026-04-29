@@ -31,8 +31,20 @@
 #include "uuid_ac.h"
 
 /* system headers */
+#if defined(HAVE_WINSOCK2_H) && HAVE_WINSOCK2_H
+/* workaround conflicts with system headers */
+#define uuid_t       __vendor_uuid_t
+#define uuid_create  __vendor_uuid_create
+#define uuid_compare __vendor_uuid_compare
+#include <WinSock2.h>
+#undef  uuid_t
+#undef  uuid_create
+#undef  uuid_compare
+#endif
 #include <stdlib.h>
+#if defined(HAVE_UNISTD_H) && HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <time.h>
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
