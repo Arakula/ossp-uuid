@@ -11,10 +11,13 @@
   This is a list of all changes to OSSP uuid.
   For a more brief summary please have a look at the NEWS file.
 
-  Changes between 1.6.2 and 1.6.3 (04-Jul-2008 to 13-Mar-2026) - DeviceAuthority patch, not an official update!
+  Changes between 1.6.2 and 1.6.3 (04-Jul-2008 to 29-Apr-2026) - DeviceAuthority patch, not an official update!
 
    o Fixed memory leak in Windows - releasing CNG context after generating random.
      [Device Authority]
+   
+   o Added MSVC builds and MAC address detection for Windows
+     [Arakula]
 
   Changes between 1.6.1 and 1.6.2 (21-Feb-2008 to 04-Jul-2008)
 

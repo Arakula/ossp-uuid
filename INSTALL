@@ -21,3 +21,9 @@
     $ make check
     $ make install [DESTDIR=/path/to/temp/root]
 
+
+  For Windows with Microsoft Visual Studio >= 2008:
+  
+  There is a ossp-uuid solution in the msvc subdirectory
+  which allows generation of DLL and static library versions
+  for 32-bit and 64-bit (x64).
