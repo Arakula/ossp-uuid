@@ -197,7 +197,7 @@ int mac_address(unsigned char *data_ptr, size_t data_len)
     /* use GetAdaptersInfo to get the first available adapter address
        (Windows 2000 and later!) */
 
-    /* Modified example from GetAdaptersInfo documentation */
+    /* Modified GetAdaptersInfo documentation example */
     {
     PIP_ADAPTER_INFO pAdapterInfo;
     PIP_ADAPTER_INFO pAdapter = NULL;
@@ -244,7 +244,6 @@ int mac_address(unsigned char *data_ptr, size_t data_len)
         }
     } 
     free(pAdapterInfo);
-
     }
 #endif
 
