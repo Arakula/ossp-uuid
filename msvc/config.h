@@ -77,7 +77,7 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the `nanosleep' function. */
-#define HAVE_NANOSLEEP 1
+/* #define HAVE_NANOSLEEP 1 */
 
 /* Define to 1 if you have the <netdb.h> header file. */
 /* #define HAVE_NETDB_H 1 */
