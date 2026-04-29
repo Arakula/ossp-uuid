@@ -207,7 +207,6 @@ int mac_address(unsigned char *data_ptr, size_t data_len)
     ULONG ulOutBufLen = sizeof (IP_ADAPTER_INFO);
     pAdapterInfo = (IP_ADAPTER_INFO *) malloc(sizeof (IP_ADAPTER_INFO));
     if (pAdapterInfo == NULL) {
-        /* printf("Error allocating memory needed to call GetAdaptersinfo\n"); */
         return FALSE;
     }
     /* Make an initial call to GetAdaptersInfo to get
@@ -216,7 +215,6 @@ int mac_address(unsigned char *data_ptr, size_t data_len)
         free(pAdapterInfo);
         pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
         if (pAdapterInfo == NULL) {
-            /* printf("Error allocating memory needed to call GetAdaptersinfo\n"); */
             return FALSE;
         }
     }
