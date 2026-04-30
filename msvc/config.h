@@ -232,4 +232,4 @@
 
 /* Define to id of used va_copy() implementation */
 /* #define __VA_COPY_USE __VA_COPY_USE_C99 */
-#define __VA_COPY_USE __VA_COPY_USE_CPP
+#define __VA_COPY_USE __VA_COPY_USE_CPS
