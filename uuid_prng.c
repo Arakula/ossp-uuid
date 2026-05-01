@@ -64,6 +64,9 @@ struct prng_st {
     int    dev; /* system PRNG device */
     md5_t *md5; /* local MD5 PRNG engine */
     long   cnt; /* time resolution compensation counter */
+#ifdef WIN32
+    HCRYPTPROV hProv;
+#endif
 };
 
 prng_rc_t prng_create(prng_t **prng)
@@ -92,6 +95,9 @@ prng_rc_t prng_create(prng_t **prng)
         (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
         (*prng)->dev = fd;
     }
+#else
+    if (!CryptAcquireContext(&(*prng)->hProv, NULL, NULL, PROV_RSA_FULL, 0))
+        (*prng)->hProv = 0;
 #endif
 
     /* initialize MD5 engine */
@@ -131,9 +137,6 @@ prng_rc_t prng_data(prng_t *prng, void *data_ptr, size_t data_len)
     size_t md5_len;
     int retries;
     int i;
-#if defined(WIN32)
-    HCRYPTPROV hProv;
-#endif
 
     /* sanity check argument(s) */
     if (prng == NULL || data_len == 0)
@@ -160,10 +163,10 @@ prng_rc_t prng_data(prng_t *prng, void *data_ptr, size_t data_len)
     }
 #if defined(WIN32)
     else {
-        if (CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_FULL, 0))
+        if (prng->hProv)
         {
-            CryptGenRandom(hProv, n, p);
-            CryptReleaseContext(hProv, 0);
+            if (CryptGenRandom(prng->hProv, n, p))
+                n = 0;
         }
     }
 #endif
@@ -201,6 +204,11 @@ prng_rc_t prng_destroy(prng_t *prng)
     /* close PRNG device */
     if (prng->dev != -1)
         (void)close(prng->dev);
+
+#ifdef WIN32
+    if (prng->hProv)
+        CryptReleaseContext(prng->hProv, 0);
+#endif
 
     /* destroy MD5 engine */
     (void)md5_destroy(prng->md5);
