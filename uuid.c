@@ -1108,7 +1108,7 @@ static uuid_rc_t uuid_make_v7(uuid_t *uuid, unsigned int mode, va_list ap)
     /* convert from timeval (sec,usec) to OSSP ui64 (unix epoch msec) format */
     t = ui64_n2i((unsigned long)time_now.tv_sec);
     t = ui64_muln(t, 1000, NULL);
-    t = ui64_addn(t, (int)time_now.tv_usec / 1000, NULL);
+    t = ui64_addn(t, (int)(time_now.tv_usec / 1000L), NULL);
 
     /* store the 48 LSB of the time in the UUID */
     t = ui64_rol(t, 48, &ov);
@@ -1117,11 +1117,18 @@ static uuid_rc_t uuid_make_v7(uuid_t *uuid, unsigned int mode, va_list ap)
     t = ui64_rol(t, 16, &ov);
     uuid->obj.time_mid =
       (uuid_uint16_t)(ui64_i2n(ov) & 0x0000ffff); /* all 16 bit */
-    t = ui64_rol(t, 12, &ov);
 
-    if (prng_data(uuid->prng, (void *)&(uuid->obj.time_hi_and_version),
-                  sizeof(uuid->obj.time_hi_and_version) +
-                      sizeof(uuid->obj.clock_seq_hi_and_reserved) +
+    /* basic UUID7 requirements fulfilled; now make it monotonic, too */
+
+    /* it's a bit hard to pack 0..999 microseconds plus a sequence conter
+       into 12 bits. The method used here overlaps in 2 bits.
+       Works for me ... but it might be a good idea to redo this.
+       */
+    uuid->obj.time_hi_and_version = 
+        (uuid_uint16_t)((time_now.tv_usec % 1000L) * 4 + uuid->time_seq);
+
+    if (prng_data(uuid->prng, (void *)&(uuid->obj.clock_seq_hi_and_reserved),
+                  sizeof(uuid->obj.clock_seq_hi_and_reserved) +
                       sizeof(uuid->obj.clock_seq_low) +
                       sizeof(uuid->obj.node)) != PRNG_RC_OK)
         return UUID_RC_INT;
