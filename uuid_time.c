@@ -80,19 +80,69 @@ int time_gettimeofday(struct timeval *tv)
     FILETIME ft;
     LARGE_INTEGER li;
     __int64 t;
-    static int tzflag;
+
 #if !defined(__GNUC__)
 #define EPOCHFILETIME 116444736000000000i64
 #else
 #define EPOCHFILETIME 116444736000000000LL
 #endif
     if (tv != NULL) {
+
+#if 1
+        /* much higher resolution by using QueryPerformanceCounter() */
+
+        static BOOL qpcinitialized = FALSE;
+        static LARGE_INTEGER qpc_freq;
+        static LARGE_INTEGER base_qpc;
+        static __int64 base_system_time_us;
+        static __int64 resync_interval_ticks;
+        LARGE_INTEGER cur_qpc;
+        __int64 qpc_ticks;
+        __int64 delta_us;
+
+        if (!qpcinitialized) {
+            QueryPerformanceFrequency(&qpc_freq);
+            QueryPerformanceCounter(&base_qpc);
+
+            GetSystemTimeAsFileTime(&ft);
+            li.LowPart  = ft.dwLowDateTime;
+            li.HighPart = ft.dwHighDateTime;
+            base_system_time_us = li.QuadPart;
+            base_system_time_us -= EPOCHFILETIME;
+            base_system_time_us /= 10;
+            // Resync every ~0.5 seconds worth of QPC ticks
+            resync_interval_ticks = qpc_freq.QuadPart / 2;
+            qpcinitialized = TRUE;
+        }
+
+        QueryPerformanceCounter(&cur_qpc);
+        qpc_ticks = cur_qpc.QuadPart - base_qpc.QuadPart;
+        if (qpc_ticks > resync_interval_ticks) {
+            /* resync from time to time */
+            base_qpc = cur_qpc;
+            GetSystemTimeAsFileTime(&ft);
+            li.LowPart  = ft.dwLowDateTime;
+            li.HighPart = ft.dwHighDateTime;
+            base_system_time_us = li.QuadPart;
+            base_system_time_us -= EPOCHFILETIME;
+            base_system_time_us /= 10;
+            qpc_ticks = 0;
+        }
+
+        /* Convert QPC ticks into microseconds */
+        delta_us = (qpc_ticks * 1000000LL) / qpc_freq.QuadPart;
+        /*  Combine with base system time */
+        t = base_system_time_us + delta_us;
+
+#else
+        /* much lower resolution, but also much less code */
         GetSystemTimeAsFileTime(&ft);
         li.LowPart  = ft.dwLowDateTime;
         li.HighPart = ft.dwHighDateTime;
         t  = li.QuadPart;
         t -= EPOCHFILETIME;
         t /= 10;
+#endif
         tv->tv_sec  = (long)(t / 1000000);
         tv->tv_usec = (long)(t % 1000000);
     }
@@ -107,16 +157,30 @@ int time_usleep(long usec)
 {
 #if defined(WIN32) && defined(HAVE_SLEEP)
     /* Win32 newer Sleep(3) variant */
-    Sleep(usec / 1000);
-#elif defined(WIN32)
-    /* Win32 older _sleep(3) variant */
-    _sleep(usec / 1000);
+    if (usec < 5) {
+        /* if Sleep() is defined, QueryPerformanceCounter() is also there, so use this for small
+           microsecond sleeps. This uses 100% CPU time, so it shouldn't be done for larger values. */
+        LARGE_INTEGER freq, start, now;
+        const double target = usec / 1e6;
+        int nloops = 0;
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&start);
+        do {
+            QueryPerformanceCounter(&now);
+            nloops++;
+        } while ((now.QuadPart - start.QuadPart) / (double)freq.QuadPart < target);
+    }
+    else /* Sleep(), however, is limited to the system timer tick granularity, which is some MILLIseconds. */
+        Sleep(usec / 1000);
 #elif defined(HAVE_NANOSLEEP)
     /* POSIX newer nanosleep(3) variant */
     struct timespec ts;
     ts.tv_sec  = 0;
     ts.tv_nsec = 1000 * usec;
     nanosleep(&ts, NULL);
+#elif defined(WIN32)
+    /* Win32 older _sleep(3) variant */
+    _sleep(usec / 1000);
 #else
     /* POSIX older select(2) variant */
     struct timeval tv;
