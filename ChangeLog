@@ -11,13 +11,18 @@
   This is a list of all changes to OSSP uuid.
   For a more brief summary please have a look at the NEWS file.
 
+  Changes between 1.6.3 and 1.6.4 (19-Apr-2016 to 01-May-2026) - Hermann Seib patch, not an official update!
+  
+   o Added UUID v6 and v7 support
+     [Hermann Seib]
+  
   Changes between 1.6.2 and 1.6.3 (04-Jul-2008 to 29-Apr-2026) - DeviceAuthority patch, not an official update!
 
    o Fixed memory leak in Windows - releasing CNG context after generating random.
      [Device Authority]
    
    o Added MSVC builds and MAC address detection for Windows
-     [Arakula]
+     [Hermann Seib]
 
   Changes between 1.6.1 and 1.6.2 (21-Feb-2008 to 04-Jul-2008)
 

@@ -154,6 +154,8 @@ int main(int argc, char *argv[])
                     case 3: version = UUID_MAKE_V3; break;
                     case 4: version = UUID_MAKE_V4; break;
                     case 5: version = UUID_MAKE_V5; break;
+                    case 6: version = UUID_MAKE_V6; break;
+                    case 7: version = UUID_MAKE_V7; break;
                     default:
                         usage("invalid version on option 'v'");
                         break;
@@ -225,7 +227,9 @@ int main(int argc, char *argv[])
         if (   (version == UUID_MAKE_V1 && argc != 0)
             || (version == UUID_MAKE_V3 && argc != 2)
             || (version == UUID_MAKE_V4 && argc != 0)
-            || (version == UUID_MAKE_V5 && argc != 2))
+            || (version == UUID_MAKE_V5 && argc != 2)
+            || (version == UUID_MAKE_V6 && argc != 0)
+            || (version == UUID_MAKE_V7 && argc != 0))
             usage("invalid number of arguments");
         if ((rc = uuid_create(&uuid)) != UUID_RC_OK)
             error(1, "uuid_create: %s", uuid_error(rc));

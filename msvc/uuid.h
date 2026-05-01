@@ -57,7 +57,7 @@
 DECLARATION_BEGIN
 
 /* OSSP uuid version (compile-time information) */
-#define UUID_VERSION  0x106203
+#define UUID_VERSION  0x106401
 
 /* encoding octet stream lengths */
 #define UUID_LEN_BIN  (128 /*bit*/ / 8 /*bytes*/)
@@ -80,6 +80,8 @@ enum {
     UUID_MAKE_V3 = (1 << 1), /* DCE 1.1 v3 UUID */
     UUID_MAKE_V4 = (1 << 2), /* DCE 1.1 v4 UUID */
     UUID_MAKE_V5 = (1 << 3), /* DCE 1.1 v5 UUID */
+    UUID_MAKE_V6 = (1 << 5), /* DCE 1.1 v6 UUID */
+    UUID_MAKE_V7 = (1 << 6), /* DCE 1.1 v7 UUID */
     UUID_MAKE_MC = (1 << 4)  /* enforce multi-cast MAC address */
 };
 

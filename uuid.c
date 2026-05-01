@@ -644,7 +644,10 @@ static struct {
     { 1, "time and node based" },
     { 3, "name based, MD5" },
     { 4, "random data based" },
-    { 5, "name based, SHA-1" }
+    { 5, "name based, SHA-1" },
+    { 6, "time and node based" },
+    { 7, "time and random data based" },
+    { 8, "experimental or vendor-specific" }
 };
 
 /* INTERNAL: dump UUID object as descriptive text */
@@ -743,13 +746,21 @@ static uuid_rc_t uuid_export_txt(const uuid_t *uuid, void *_data_ptr, size_t *da
      * decode UUID content
      */
 
-    if (tmp8 == BM_OCTET(1,0,0,0,0,0,0,0) && tmp16 == 1) {
+    if (tmp8 == BM_OCTET(1,0,0,0,0,0,0,0) && (tmp16 == 1 || tmp16 == 6)) {
         /* decode DCE 1.1 version 1 UUID */
 
         /* decode system time */
-        t = ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_hi_and_version & BM_MASK(11,0))), 48, NULL),
-        t = ui64_or(t, ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_mid)), 32, NULL));
-        t = ui64_or(t, ui64_n2i((unsigned long)(uuid->obj.time_low)));
+        if (tmp16 == 1) {
+            t = ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_hi_and_version & BM_MASK(11, 0))), 48, NULL);
+            t = ui64_or(t, ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_mid)), 32, NULL));
+            t = ui64_or(t, ui64_n2i((unsigned long)(uuid->obj.time_low)));
+        }
+        else if (tmp16 == 6) {
+            /* in v6, time high and low are reversed */
+            t = ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_low)), 28, NULL);
+            t = ui64_or(t, ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_mid)), 12, NULL));
+            t = ui64_or(t, ui64_n2i((unsigned long)(uuid->obj.time_hi_and_version & BM_MASK(11, 0))));
+        }
         t_offset = ui64_s2i(UUID_TIMEOFFSET, NULL, 16);
         t = ui64_sub(t, t_offset, NULL);
         t = ui64_divn(t, 10, &t_nsec);
@@ -775,6 +786,37 @@ static uuid_rc_t uuid_export_txt(const uuid_t *uuid, void *_data_ptr, size_t *da
             (uuid->obj.node[0] & IEEE_MAC_LOBIT ? "local" : "global"),
             (uuid->obj.node[0] & IEEE_MAC_MCBIT ? "multicast" : "unicast"));
     }
+    else if (tmp8 == BM_OCTET(1,0,0,0,0,0,0,0) && tmp16 == 7) {
+        /* decode DCE 1.1 version 7 UUID */
+        t = ui64_rol(ui64_n2i((unsigned long)(uuid->obj.time_low)), 16, NULL);
+        t = ui64_or(t, ui64_n2i((unsigned long)(uuid->obj.time_mid)));
+        t = ui64_divn(t, 1000, &t_usec);
+        t_sec = (time_t)ui64_i2n(t);
+        tm = gmtime(&t_sec);
+        (void)strftime(t_buf, sizeof(t_buf), "%Y-%m-%d %H:%M:%S", tm);
+        (void)str_rsprintf(out, "        content: time:  %s.%03d UTC\n", t_buf, t_usec);
+        
+        /* pack UUID into binary representation */
+        tmp_ptr = (void *)&tmp_bin;
+        tmp_len = sizeof(tmp_bin);
+        if ((rc = uuid_export(uuid, UUID_FMT_BIN, &tmp_ptr, &tmp_len)) != UUID_RC_OK)
+            return rc;
+
+        /* mask out version and variant parts */
+        tmp_bin[6] &= BM_MASK(3,0);
+        tmp_bin[8] &= BM_MASK(5,0);
+
+        /* dump as colon-seperated hexadecimal byte-string */
+        content = "no semantics: random data only";
+        (void)str_rsprintf(out,
+            "                 data:  %02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X\n"
+            "                 (%s)\n",
+            (unsigned int)tmp_bin[6],  (unsigned int)tmp_bin[7],  (unsigned int)tmp_bin[8],
+            (unsigned int)tmp_bin[9],  (unsigned int)tmp_bin[10], (unsigned int)tmp_bin[11],
+            (unsigned int)tmp_bin[12], (unsigned int)tmp_bin[13], (unsigned int)tmp_bin[14],
+            (unsigned int)tmp_bin[15], content);
+
+    }
     else {
         /* decode anything else as hexadecimal byte-string only */
 
@@ -788,6 +830,8 @@ static uuid_rc_t uuid_export_txt(const uuid_t *uuid, void *_data_ptr, size_t *da
             content = "no semantics: random data only";
         else if (tmp16 == 5)
             content = "not decipherable: truncated SHA-1 message digest only";
+        else if (tmp16 == 8)
+            content = "unknown semantics: custom data format";
 
         /* pack UUID into binary representation */
         tmp_ptr = (void *)&tmp_bin;
@@ -884,7 +928,7 @@ static void uuid_brand(uuid_t *uuid, unsigned int version)
     return;
 }
 
-/* INTERNAL: generate UUID version 1: time, clock and node based */
+/* INTERNAL: generate UUID version 1 or 6: time, clock and node based */
 static uuid_rc_t uuid_make_v1(uuid_t *uuid, unsigned int mode, va_list ap)
 {
     struct timeval time_now;
@@ -939,15 +983,29 @@ static uuid_rc_t uuid_make_v1(uuid_t *uuid, unsigned int mode, va_list ap)
         t = ui64_addn(t, (int)uuid->time_seq, NULL);
 
     /* store the 60 LSB of the time in the UUID */
-    t = ui64_rol(t, 16, &ov);
-    uuid->obj.time_hi_and_version =
-        (uuid_uint16_t)(ui64_i2n(ov) & 0x00000fff); /* 12 of 16 bit only! */
-    t = ui64_rol(t, 16, &ov);
-    uuid->obj.time_mid =
-        (uuid_uint16_t)(ui64_i2n(ov) & 0x0000ffff); /* all 16 bit */
-    t = ui64_rol(t, 32, &ov);
-    uuid->obj.time_low =
-        (uuid_uint32_t)(ui64_i2n(ov) & 0xffffffff); /* all 32 bit */
+    if (mode & UUID_MAKE_V1) {
+        t = ui64_rol(t, 16, &ov);
+        uuid->obj.time_hi_and_version =
+            (uuid_uint16_t)(ui64_i2n(ov) & 0x00000fff); /* 12 of 16 bit only! */
+        t = ui64_rol(t, 16, &ov);
+        uuid->obj.time_mid =
+            (uuid_uint16_t)(ui64_i2n(ov) & 0x0000ffff); /* all 16 bit */
+        t = ui64_rol(t, 32, &ov);
+        uuid->obj.time_low =
+            (uuid_uint32_t)(ui64_i2n(ov) & 0xffffffff); /* all 32 bit */
+    }
+    else if (mode & UUID_MAKE_V6) {
+        /* v6 reverses time high and low */
+        t = ui64_rol(t, 36, &ov);
+        uuid->obj.time_low =
+            (uuid_uint32_t)(ui64_i2n(ov) & 0xffffffff); /* all 32 bit */
+        t = ui64_rol(t, 16, &ov);
+        uuid->obj.time_mid =
+          (uuid_uint16_t)(ui64_i2n(ov) & 0x0000ffff); /* all 16 bit */
+        t = ui64_rol(t, 12, &ov);
+        uuid->obj.time_hi_and_version =
+            (uuid_uint16_t)(ui64_i2n(ov) & 0x00000fff); /* 12 of 16 bit only! */
+    }
 
     /*
      *  GENERATE CLOCK
@@ -1002,7 +1060,82 @@ static uuid_rc_t uuid_make_v1(uuid_t *uuid, unsigned int mode, va_list ap)
     uuid->time_last.tv_usec = time_now.tv_usec;
 
     /* brand with version and variant */
-    uuid_brand(uuid, 1);
+    if (mode & UUID_MAKE_V1)
+        uuid_brand(uuid, 1);
+    else if (mode & UUID_MAKE_V6)
+        uuid_brand(uuid, 6);
+
+    return UUID_RC_OK;
+}
+
+/* INTERNAL: generate UUID version 7: unix epoch, random data */
+static uuid_rc_t uuid_make_v7(uuid_t *uuid, unsigned int mode, va_list ap)
+{
+    struct timeval time_now;
+    ui64_t t;
+    ui64_t ov;
+
+    /*
+     *  GENERATE TIME
+     */
+
+    /* determine current system time and sequence counter */
+    for (;;) {
+        /* determine current system time */
+        if (time_gettimeofday(&time_now) == -1)
+            return UUID_RC_SYS;
+
+        /* check whether system time changed since last retrieve */
+        if (!(   time_now.tv_sec  == uuid->time_last.tv_sec
+              && time_now.tv_usec == uuid->time_last.tv_usec)) {
+            /* reset time sequence counter and continue */
+            uuid->time_seq = 0;
+            break;
+        }
+
+        /* until we are out of UUIDs per tick, increment
+           the time/tick sequence counter and continue */
+        if (uuid->time_seq < UUIDS_PER_TICK) {
+            uuid->time_seq++;
+            break;
+        }
+
+        /* stall the UUID generation until the system clock (which
+           has a gettimeofday(2) resolution of 1us) catches up */
+        time_usleep(1);
+    }
+
+    /* convert from timeval (sec,usec) to OSSP ui64 (unix epoch msec) format */
+    t = ui64_n2i((unsigned long)time_now.tv_sec);
+    t = ui64_muln(t, 1000, NULL);
+    t = ui64_addn(t, (int)time_now.tv_usec / 1000, NULL);
+
+    /* store the 48 LSB of the time in the UUID */
+    t = ui64_rol(t, 48, &ov);
+    uuid->obj.time_low =
+        (uuid_uint32_t)(ui64_i2n(ov) & 0xffffffff); /* all 32 bit */
+    t = ui64_rol(t, 16, &ov);
+    uuid->obj.time_mid =
+      (uuid_uint16_t)(ui64_i2n(ov) & 0x0000ffff); /* all 16 bit */
+    t = ui64_rol(t, 12, &ov);
+
+    if (prng_data(uuid->prng, (void *)&(uuid->obj.time_hi_and_version),
+                  sizeof(uuid->obj.time_hi_and_version) +
+                      sizeof(uuid->obj.clock_seq_hi_and_reserved) +
+                      sizeof(uuid->obj.clock_seq_low) +
+                      sizeof(uuid->obj.node)) != PRNG_RC_OK)
+        return UUID_RC_INT;
+
+    /*
+     *  FINISH
+     */
+
+    /* remember current system time for next iteration */
+    uuid->time_last.tv_sec  = time_now.tv_sec;
+    uuid->time_last.tv_usec = time_now.tv_usec;
+
+    /* brand with version and variant */
+    uuid_brand(uuid, 7);
 
     return UUID_RC_OK;
 }
@@ -1199,6 +1332,10 @@ uuid_rc_t uuid_make(uuid_t *uuid, unsigned int mode, ...)
         rc = uuid_make_v4(uuid, mode, ap);
     else if (mode & UUID_MAKE_V5)
         rc = uuid_make_v5(uuid, mode, ap);
+    else if (mode & UUID_MAKE_V6)
+      rc = uuid_make_v1(uuid, mode, ap); /* v1 knows about v6 */
+    else if (mode & UUID_MAKE_V7)
+      rc = uuid_make_v7(uuid, mode, ap);
     else
         rc = UUID_RC_ARG;
     va_end(ap);
