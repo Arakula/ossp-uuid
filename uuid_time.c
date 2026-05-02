@@ -162,12 +162,10 @@ int time_usleep(long usec)
            microsecond sleeps. This uses 100% CPU time, so it shouldn't be done for larger values. */
         LARGE_INTEGER freq, start, now;
         const double target = usec / 1e6;
-        int nloops = 0;
         QueryPerformanceFrequency(&freq);
         QueryPerformanceCounter(&start);
         do {
             QueryPerformanceCounter(&now);
-            nloops++;
         } while ((now.QuadPart - start.QuadPart) / (double)freq.QuadPart < target);
     }
     else /* Sleep(), however, is limited to the system timer tick granularity, which is some MILLIseconds. */
