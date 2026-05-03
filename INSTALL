@@ -26,4 +26,6 @@
   
   There is a ossp-uuid solution in the msvc subdirectory
   which allows generation of DLL and static library versions
-  for 32-bit and 64-bit (x64).
+  for 32-bit and 64-bit (x64). Two, actually:
+  ossp-uuid.sln is for VS2008 up to VS2019.
+  ossp-uuid.22.sln is for VS2022 and above.
